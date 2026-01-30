@@ -1,0 +1,64 @@
+services:
+  # Caddy Reverse Proxy with IP (no SSL)
+  caddy:
+    image: caddy:2-alpine
+    container_name: stoplist-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_logs:/var/log/caddy
+    networks:
+      - stoplist-network
+    depends_on:
+      - stoplist-frontend
+      - stoplist-backend
+
+  # Backend API Service
+  stoplist-backend:
+    build:
+      context: ../pcl-backend
+      dockerfile: Dockerfile
+    container_name: stoplist-backend
+    ports:
+      - "3836:3837"
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      # These can also be set in .env
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: ${DB_DATABASE}
+      JWT_SECRET_KEY: ${JWT_SECRET:-stoplist-jwt-secret-key}
+      JWT_EXPIRATION_TIME: ${JWT_EXPIRES_IN:-24h}
+      APP_PORT: 3837
+    networks:
+      - stoplist-network
+
+  # Frontend Service
+  stoplist-frontend:
+    build:
+      context: ../pcl-frontend
+      dockerfile: Dockerfile
+    container_name: stoplist-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    ports:
+      - "3000:3000"
+    networks:
+      - stoplist-network
+
+networks:
+  stoplist-network:
+    driver: bridge
+
+volumes:
+  caddy_logs:
+    driver: local
